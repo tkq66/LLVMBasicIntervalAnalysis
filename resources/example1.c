@@ -1,9 +1,9 @@
 int main() {
-    int a, b, c, d = 0;
+    int x, a;
+    int b = 5;
     if (a > 0)
-        c = 5;
+        x = 3 + b;
     else
-        c = 10;
-    if (b > 0)
-        d = -11;
+        x = 3 - b;
+    return x;
 }

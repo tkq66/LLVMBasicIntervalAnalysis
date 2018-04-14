@@ -1,7 +1,7 @@
 /**
- *  DifferencePass.cpp
+ *  IntervalPass.cpp
  *
- *  Performs difference analysis on simple programs over an LLVM IR pass.
+ *  Performs interval analysis on simple programs over an LLVM IR pass.
  *
  *  Created by CS5218 - Principles of Program Analysis
  *  Modified by Teekayu Klongtruajrok (A0174348X)

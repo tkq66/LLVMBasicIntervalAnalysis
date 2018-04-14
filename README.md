@@ -1,5 +1,5 @@
 # CS5218 - Program Analysis
-## Assignment 2 - Difference Analysis
+## Assignment 3 - Interval
 
 ## Dependencies
 
@@ -19,6 +19,7 @@ The files currently there are
 ```
 example1.c
 example2.c
+example3.c
 ```
 
 You can build this project by running
@@ -31,7 +32,7 @@ To run the analysis over the IR, you can run
 ```
 ./run.sh <file option>
 ```
-This will perform difference analysis on example1.c or example2.c (file option being 1 or 2 respectively).
+This will perform interval analysis on example1.c, example2.c, or example3.c (file option being 1, 2, or 3 respectively).
 
 ## Helpers
 
