@@ -9,18 +9,20 @@
 using namespace llvm;
 
 class SeparationTracker {
-    private:
-        std::tuple<std::string, std::string> variableNames;
-        ValueTracker valueTracker;
-        double separation;
-
     public:
+        typedef std::tuple<std::string, std::string> var_pair_t;
+
         SeparationTracker(std::string varNameOne, std::string varNameTwo);
         double processNewEntry(Instruction *i);
         void printSeparationReport();
         void printVariableTracker();
         double calculateSeparation();
         double getSeparation();
+
+    private:
+        var_pair_t variableNames;
+        ValueTracker valueTracker;
+        double separation;
 };
 
 #endif

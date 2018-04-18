@@ -10,23 +10,24 @@
 #include "llvm/IR/Instruction.h"
 #include "llvm/IR/Constants.h"
 #include "ValueTracker.h"
+#include "IntervalTracker.h"
 
-void ValueTracker::printTracker() {
+void IntervalTracker::printTracker() {
     for (auto variable = variablesTracker.begin(); variable != variablesTracker.end(); ++variable) {
         printf("Key: %s - Value: %lf\n", variable->first.c_str(), variable->second);
     }
     printf("\n");
 }
 
-double ValueTracker::selectVariable(std::string name) {
+double IntervalTracker::selectVariable(std::string name) {
     return (variablesTracker.find(name) != variablesTracker.end()) ? variablesTracker[name] : std::nan("inifinity");
 }
 
-void ValueTracker::editVariable(std::string name, double value) {
+void IntervalTracker::editVariable(std::string name, double value) {
     variablesTracker[name] = value;
 }
 
-void ValueTracker::processNewEntry(Instruction* i) {
+void IntervalTracker::processNewEntry(Instruction* i) {
     if (isa<AllocaInst>(i)) {
         allocateNewVariable(dyn_cast<AllocaInst>(i));
     }
@@ -41,20 +42,20 @@ void ValueTracker::processNewEntry(Instruction* i) {
     }
 }
 
-void ValueTracker::allocateNewVariable(AllocaInst* i) {
+void IntervalTracker::allocateNewVariable(AllocaInst* i) {
     std::string varName;
     if (!i->hasName()) {
         return;
     }
     varName = i->getName().str();
-    var_t variable = std::make_pair(varName, std::nan("inifinity"));
+    std::pair<std::string, double> variable = std::make_pair(varName, std::nan("inifinity"));
     variablesTracker.insert(variable);
 }
 
-void ValueTracker::storeValueIntoVariable(StoreInst* i) {
+void IntervalTracker::storeValueIntoVariable(StoreInst* i) {
     double src;
     if (i->getOperand(0)->hasName()) {
-        var_map_t::const_iterator existingVariable = variablesTracker.find(i->getOperand(0)->getName().str());
+        std::unordered_map<std::string, double>::const_iterator existingVariable = variablesTracker.find(i->getOperand(0)->getName().str());
         src = existingVariable->second;
     }
     else {
@@ -65,30 +66,30 @@ void ValueTracker::storeValueIntoVariable(StoreInst* i) {
     variablesTracker[dest] = src;
 }
 
-void ValueTracker::loadVariableIntoRegister(LoadInst* i) {
+void IntervalTracker::loadVariableIntoRegister(LoadInst* i) {
     std::string variableName = i->getOperand(0)->getName().str();
     double variableValue = variablesTracker[variableName];
     std::stringstream registerValue;
     registerValue << (void*)i;
     std::string registerString = registerValue.str();
-    var_t registerVariable = std::make_pair(registerString, variableValue);
+    std::pair<std::string, double> registerVariable = std::make_pair(registerString, variableValue);
     variablesTracker.insert(registerVariable);
 }
 
-void ValueTracker::processCalculation(BinaryOperator* i) {
-    arithmetic_function_t calculation;
+void IntervalTracker::processCalculation(BinaryOperator* i) {
+    std::function<double(double, double)> calculation;
     switch (i->getOpcode()) {
         case Instruction::Add:
-            calculation = std::bind(&ValueTracker::addCallback, this, std::placeholders::_1, std::placeholders::_2);
+            calculation = std::bind(&IntervalTracker::addCallback, this, std::placeholders::_1, std::placeholders::_2);
             break;
         case Instruction::Mul:
-            calculation = std::bind(&ValueTracker::mulCallback, this, std::placeholders::_1, std::placeholders::_2);
+            calculation = std::bind(&IntervalTracker::mulCallback, this, std::placeholders::_1, std::placeholders::_2);
             break;
         case Instruction::Sub:
-            calculation = std::bind(&ValueTracker::subCallback, this, std::placeholders::_1, std::placeholders::_2);
+            calculation = std::bind(&IntervalTracker::subCallback, this, std::placeholders::_1, std::placeholders::_2);
             break;
         case Instruction::SRem:
-            calculation = std::bind(&ValueTracker::sremCallback, this, std::placeholders::_1, std::placeholders::_2);
+            calculation = std::bind(&IntervalTracker::sremCallback, this, std::placeholders::_1, std::placeholders::_2);
             break;
         default:
             break;
@@ -96,7 +97,7 @@ void ValueTracker::processCalculation(BinaryOperator* i) {
     calculateArithmetic(i, calculation);
 }
 
-void ValueTracker::calculateArithmetic(BinaryOperator* i, arithmetic_function_t callback) {
+void IntervalTracker::calculateArithmetic(BinaryOperator* i, std::function<double(double, double)> callback) {
     double destValue;
     for (auto val = i->value_op_begin(); val != i->value_op_end(); ++val) {
         std::string currentName;
@@ -117,11 +118,11 @@ void ValueTracker::calculateArithmetic(BinaryOperator* i, arithmetic_function_t 
         destValue = (val == i->value_op_begin()) ? currentValue : callback(destValue, currentValue);
     }
     std::string destName = i->getName().str();
-    var_t calculatedVariable = std::make_pair(destName, destValue);
+    std::pair<std::string, double> calculatedVariable = std::make_pair(destName, destValue);
     variablesTracker.insert(calculatedVariable);
 }
 
-double ValueTracker::addCallback(double accumulator, double current) {
+double IntervalTracker::addCallback(double accumulator, double current) {
     if (std::isnan(accumulator) ||
         std::isnan(current)) {
         return std::nan("inifinity");
@@ -131,7 +132,7 @@ double ValueTracker::addCallback(double accumulator, double current) {
     }
 }
 
-double ValueTracker::subCallback(double accumulator, double current) {
+double IntervalTracker::subCallback(double accumulator, double current) {
     if (std::isnan(accumulator) ||
         std::isnan(current)) {
         return std::nan("inifinity");
@@ -141,7 +142,7 @@ double ValueTracker::subCallback(double accumulator, double current) {
     }
 }
 
-double ValueTracker::mulCallback(double accumulator, double current) {
+double IntervalTracker::mulCallback(double accumulator, double current) {
     if (std::isnan(accumulator) ||
         std::isnan(current)) {
         return std::nan("inifinity");
@@ -151,7 +152,7 @@ double ValueTracker::mulCallback(double accumulator, double current) {
     }
 }
 
-double ValueTracker::sremCallback(double accumulator, double current) {
+double IntervalTracker::sremCallback(double accumulator, double current) {
     if (std::isnan(current)) {
         return std::nan("inifinity");
     }
