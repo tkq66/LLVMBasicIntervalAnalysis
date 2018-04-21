@@ -22,8 +22,8 @@ double SeparationTracker::processNewEntry(Instruction* i) {
 void SeparationTracker::printSeparationReport() {
     const char * varNameOne = std::get<0>(variableNames).c_str();
     const char * varNameTwo = std::get<1>(variableNames).c_str();
-    double varOne = valueTracker.selectVariable(varNameOne);
-    double varTwo = valueTracker.selectVariable(varNameTwo);
+    double varOne = valueTracker.getVariableValue(varNameOne);
+    double varTwo = valueTracker.getVariableValue(varNameTwo);
     printf("Sep between '%s' - %lf and '%s' - %lf = %lf", varNameOne, varOne, varNameTwo, varTwo, separation);
     printf("\n");
 }
@@ -35,8 +35,8 @@ void SeparationTracker::printVariableTracker() {
 double SeparationTracker::calculateSeparation() {
     std::string varNameOne = std::get<0>(variableNames);
     std::string varNameTwo = std::get<1>(variableNames);
-    double varOne = valueTracker.selectVariable(varNameOne);
-    double varTwo = valueTracker.selectVariable(varNameTwo);
+    double varOne = valueTracker.getVariableValue(varNameOne);
+    double varTwo = valueTracker.getVariableValue(varNameTwo);
     if (std::isnan(varOne) || std::isnan(varTwo)) {
         separation = std::nan("inifinity");
     }

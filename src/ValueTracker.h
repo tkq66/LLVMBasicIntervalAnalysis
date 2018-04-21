@@ -12,24 +12,32 @@ using namespace llvm;
 class ValueTracker : public Tracker {
     public:
         typedef std::unordered_map<std::string, double> var_map_t;
+        typedef std::unordered_map<std::string, double>::iterator var_it_t;
         typedef std::pair<std::string, double> var_t;
         typedef std::function<double(double, double)> arithmetic_function_t;
 
-        double selectVariable(std::string name);
+        // Static methods
+        static var_t getVariableFromPtr(void* ptr);
+
+        // Instance-bound methods
+        void* getPtrFromVariableName(std::string name);
+        double getVariableValue(std::string name);
         void editVariable(std::string name, double value);
 
+        // Tracker methods
         void printTracker() override;
-        void processNewEntry(Instruction *i) override;
-
-        void allocateNewVariable(AllocaInst* i) override;
-        void storeValueIntoVariable(StoreInst* i) override;
-        void loadVariableIntoRegister(LoadInst* i) override;
-        void processCalculation(BinaryOperator* i) override;
+        void* processNewEntry(Instruction *i) override;
+        void* allocateNewVariable(AllocaInst* i) override;
+        void* storeValueIntoVariable(StoreInst* i) override;
+        void* loadVariableIntoRegister(LoadInst* i) override;
+        void* processCalculation(BinaryOperator* i) override;
 
     private:
+        // Core tracker state
         var_map_t variablesTracker;
 
-        void calculateArithmetic(BinaryOperator* i, arithmetic_function_t callback);
+        // Caclulation helpers
+        var_t calculateArithmetic(BinaryOperator* i, arithmetic_function_t callback);
         double addCallback(double accumulator, double current);
         double subCallback(double accumulator, double current);
         double mulCallback(double accumulator, double current);

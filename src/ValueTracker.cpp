@@ -11,14 +11,22 @@
 #include "llvm/IR/Constants.h"
 #include "ValueTracker.h"
 
-void ValueTracker::printTracker() {
-    for (auto variable = variablesTracker.begin(); variable != variablesTracker.end(); ++variable) {
-        printf("Key: %s - Value: %lf\n", variable->first.c_str(), variable->second);
-    }
-    printf("\n");
+static var_t ValueTracker::getVariableFromPtr(void* ptr) {
+    // TODO: Add some error handling if ptr == nullptr
+    return *static_cast<var_t*>(ptr);
 }
 
-double ValueTracker::selectVariable(std::string name) {
+void* ValueTracker::getPtrFromVariableName(std::string name) {
+    var_it_t variableIterator = variablesTracker.find(name);
+    if (variableIterator == variablesTracker.end()) {
+        return nullptr;
+    }
+    var_t variable = std::make_pair(variableIterator->first, variableIterator->second);
+    void* elementPtr = &variable;
+    return elementPtr;
+}
+
+double ValueTracker::getVariableValue(std::string name) {
     return (variablesTracker.find(name) != variablesTracker.end()) ? variablesTracker[name] : std::nan("inifinity");
 }
 
@@ -26,22 +34,29 @@ void ValueTracker::editVariable(std::string name, double value) {
     variablesTracker[name] = value;
 }
 
-void ValueTracker::processNewEntry(Instruction* i) {
+void ValueTracker::printTracker() {
+    for (auto variable = variablesTracker.begin(); variable != variablesTracker.end(); ++variable) {
+        printf("Key: %s - Value: %lf\n", variable->first.c_str(), variable->second);
+    }
+    printf("\n");
+}
+
+void* ValueTracker::processNewEntry(Instruction* i) {
     if (isa<AllocaInst>(i)) {
-        allocateNewVariable(dyn_cast<AllocaInst>(i));
+        return allocateNewVariable(dyn_cast<AllocaInst>(i));
     }
     else if (isa<StoreInst>(i)) {
-        storeValueIntoVariable(dyn_cast<StoreInst>(i));
+        return storeValueIntoVariable(dyn_cast<StoreInst>(i));
     }
     else if (isa<LoadInst>(i)) {
-        loadVariableIntoRegister(dyn_cast<LoadInst>(i));
+        return loadVariableIntoRegister(dyn_cast<LoadInst>(i));
     }
     else if (isa<BinaryOperator>(i)) {
-        processCalculation(dyn_cast<BinaryOperator>(i));
+        return processCalculation(dyn_cast<BinaryOperator>(i));
     }
 }
 
-void ValueTracker::allocateNewVariable(AllocaInst* i) {
+void* ValueTracker::allocateNewVariable(AllocaInst* i) {
     std::string varName;
     if (!i->hasName()) {
         return;
@@ -49,9 +64,12 @@ void ValueTracker::allocateNewVariable(AllocaInst* i) {
     varName = i->getName().str();
     var_t variable = std::make_pair(varName, std::nan("inifinity"));
     variablesTracker.insert(variable);
+
+    // Returns reference to newly created entry
+    return getPtrFromVariableName(varName);
 }
 
-void ValueTracker::storeValueIntoVariable(StoreInst* i) {
+void* ValueTracker::storeValueIntoVariable(StoreInst* i) {
     double src;
     if (i->getOperand(0)->hasName()) {
         var_map_t::const_iterator existingVariable = variablesTracker.find(i->getOperand(0)->getName().str());
@@ -63,9 +81,12 @@ void ValueTracker::storeValueIntoVariable(StoreInst* i) {
     }
     std::string dest = i->getOperand(1)->getName().str();
     variablesTracker[dest] = src;
+
+    // Returns reference to recently modified entry
+    return getPtrFromVariableName(dest);
 }
 
-void ValueTracker::loadVariableIntoRegister(LoadInst* i) {
+void* ValueTracker::loadVariableIntoRegister(LoadInst* i) {
     std::string variableName = i->getOperand(0)->getName().str();
     double variableValue = variablesTracker[variableName];
     std::stringstream registerValue;
@@ -73,9 +94,12 @@ void ValueTracker::loadVariableIntoRegister(LoadInst* i) {
     std::string registerString = registerValue.str();
     var_t registerVariable = std::make_pair(registerString, variableValue);
     variablesTracker.insert(registerVariable);
+
+    // Returns reference to recently added register entry
+    return getPtrFromVariableName(registerString);
 }
 
-void ValueTracker::processCalculation(BinaryOperator* i) {
+void* ValueTracker::processCalculation(BinaryOperator* i) {
     arithmetic_function_t calculation;
     switch (i->getOpcode()) {
         case Instruction::Add:
@@ -93,10 +117,13 @@ void ValueTracker::processCalculation(BinaryOperator* i) {
         default:
             break;
     }
-    calculateArithmetic(i, calculation);
+    var_t variable = calculateArithmetic(i, calculation);
+
+    // Returns reference to recently modified entry
+    return getPtrFromVariableName(variable->first);
 }
 
-void ValueTracker::calculateArithmetic(BinaryOperator* i, arithmetic_function_t callback) {
+var_t ValueTracker::calculateArithmetic(BinaryOperator* i, arithmetic_function_t callback) {
     double destValue;
     for (auto val = i->value_op_begin(); val != i->value_op_end(); ++val) {
         std::string currentName;
@@ -119,6 +146,9 @@ void ValueTracker::calculateArithmetic(BinaryOperator* i, arithmetic_function_t 
     std::string destName = i->getName().str();
     var_t calculatedVariable = std::make_pair(destName, destValue);
     variablesTracker.insert(calculatedVariable);
+
+    // Returns reference to recently modified entry
+    return calculatedVariable;
 }
 
 double ValueTracker::addCallback(double accumulator, double current) {
