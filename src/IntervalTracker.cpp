@@ -34,6 +34,10 @@ interval_t IntervalTracker::getVariableInterval(std::string name) {
     return (intervalsTracker.find(name) != intervalsTracker.end()) ? intervalsTracker[name] : std::make_tuple(std::nan("-infinity"), std::nan("+infinity"));
 }
 
+double IntervalTracker::getVariableValue(std::string name) {
+    return valueTracker.getVariableValue(name);
+}
+
 void IntervalTracker::printTracker() {
     for (auto variable = intervalsTracker.begin(); variable != intervalsTracker.end(); ++variable) {
         printf("Key: %s - [ %lf , %lf ]\n", variable->first.c_str(), std::get<0>(variable->second), std::get<1>(variable->second));

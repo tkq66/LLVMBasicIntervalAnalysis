@@ -6,46 +6,38 @@
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Instruction.h"
 #include "llvm/IR/Constants.h"
-#include "SeparationTracker.h"
-#include "ValueTracker.h"
+#include "IntervalAnalyzer.h"
+#include "IntervalTracker.h"
 
-SeparationTracker::SeparationTracker(std::string varNameOne, std::string varNameTwo) {
-    variableNames = std::make_tuple(varNameOne, varNameTwo);
-    separation = std::nan("inifinity");
+IntervalAnalyzer::IntervalAnalyzer(std::string varName) {
+    variableName = varName;
+    interval = std::make_tuple(std::nan("-infinity"), std::nan("+infinity"));
 }
 
-double SeparationTracker::processNewEntry(Instruction* i) {
-    valueTracker.processNewEntry(i);
-    return calculateSeparation();
+IntervalTracker::interval_t IntervalAnalyzer::processNewEntry(Instruction* i) {
+    IntervalTracker::processNewEntry(i);
+    return getInterval();
 }
 
-void SeparationTracker::printSeparationReport() {
-    const char * varNameOne = std::get<0>(variableNames).c_str();
-    const char * varNameTwo = std::get<1>(variableNames).c_str();
-    double varOne = valueTracker.selectVariable(varNameOne);
-    double varTwo = valueTracker.selectVariable(varNameTwo);
-    printf("Sep between '%s' - %lf and '%s' - %lf = %lf", varNameOne, varOne, varNameTwo, varTwo, separation);
+void IntervalAnalyzer::printIntervalReport() {
+    const char* varName = variableName.c_str();
+    double varValue = IntervalTracker::getVariableValue(variableName);
+    IntervalTracker::interval_t variableInterval = getInterval();
+    double min = std::get<0>(variableInterval);
+    double max = std::get<1>(variableInterval);
+    std::string minString = (std::isnan(min)) ? "-infinity" : std::to_string(min);
+    std::string maxString = (std::isnan(max)) ? "+infinity" : std::to_string(max);
+    const char* minText = minString.c_str();
+    const char* maxText = maxString.c_str();
+    printf("Interval of variable %s = [ %s , %s] --- True value = %lf", varName, minText, maxText, varValue);
     printf("\n");
 }
 
-void SeparationTracker::printVariableTracker() {
-    valueTracker.printTracker();
+void IntervalAnalyzer::printIntervalTracker() {
+    IntervalTracker::printTracker();
 }
 
-double SeparationTracker::calculateSeparation() {
-    std::string varNameOne = std::get<0>(variableNames);
-    std::string varNameTwo = std::get<1>(variableNames);
-    double varOne = valueTracker.selectVariable(varNameOne);
-    double varTwo = valueTracker.selectVariable(varNameTwo);
-    if (std::isnan(varOne) || std::isnan(varTwo)) {
-        separation = std::nan("inifinity");
-    }
-    else {
-        separation = (varOne >= varTwo) ? (varOne - varTwo) : (varTwo - varOne);
-    }
-    return separation;
-}
-
-double SeparationTracker::getSeparation() {
-    return separation;
+IntervalTracker::interval_t IntervalAnalyzer::getInterval() {
+    interval = IntervalTracker::getVariableInterval(variableName);
+    return interval;
 }

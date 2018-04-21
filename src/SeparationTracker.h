@@ -3,8 +3,8 @@
 
 #include <string>
 #include <tuple>
-#include "ValueTracker.h"
 #include "llvm/IR/Instruction.h"
+#include "ValueTracker.h"
 
 using namespace llvm;
 

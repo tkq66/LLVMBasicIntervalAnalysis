@@ -21,7 +21,7 @@
 #include "llvm/IRReader/IRReader.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/raw_ostream.h"
-#include "SeparationTracker.h"
+#include "IntervalAnalyzer.h"
 
 #define ANSI_COLOR_RED     "\x1b[31m"
 #define ANSI_COLOR_GREEN   "\x1b[32m"
@@ -42,8 +42,8 @@ enum AnalyzeLoopBackedgeSwtch {
     OFF
 };
 
-void generateCFG (BasicBlock*, SeparationTracker* separationTracker, std::stack<BasicBlock*>, AnalyzeLoopBackedgeSwtch);
-void analyzeDifference (BasicBlock*, SeparationTracker* separationTracker);
+void generateCFG (BasicBlock*, IntervalAnalyzer* intervalAnalyzer, std::stack<BasicBlock*>, AnalyzeLoopBackedgeSwtch);
+void analyzeInterval (BasicBlock*, IntervalAnalyzer* intervalAnalyzer);
 bool isSameBlock (BasicBlock*, BasicBlock*);
 bool isMainFunction (const char*);
 bool isBeginLoop (const char*);
@@ -62,13 +62,13 @@ int main (int argc, char **argv) {
         return EXIT_FAILURE;
     }
 
-    SeparationTracker* separationTracker = new SeparationTracker(argv[2], argv[3]);
+    IntervalAnalyzer* intervalAnalyzer = new IntervalAnalyzer(argv[2]);
 
     for (auto &F: *M) {
         if (isMainFunction(F.getName().str().c_str())) {
             BasicBlock* BB = dyn_cast<BasicBlock>(F.begin());
             std::stack<BasicBlock*> loopCallStack;
-            generateCFG(BB, separationTracker, loopCallStack, ON);
+            generateCFG(BB, intervalAnalyzer, loopCallStack, ON);
         }
     }
 
@@ -76,7 +76,7 @@ int main (int argc, char **argv) {
 }
 
 
-void generateCFG (BasicBlock* BB, SeparationTracker* separationTracker, std::stack<BasicBlock*> loopCallStack, AnalyzeLoopBackedgeSwtch backedgeSwitch) {
+void generateCFG (BasicBlock* BB, IntervalAnalyzer* intervalAnalyzer, std::stack<BasicBlock*> loopCallStack, AnalyzeLoopBackedgeSwtch backedgeSwitch) {
   const char *blockName = BB->getName().str().c_str();
   printf("Label Name:%s\n", blockName);
 
@@ -95,7 +95,7 @@ void generateCFG (BasicBlock* BB, SeparationTracker* separationTracker, std::sta
       newBackedgeSwitch = ON;
   }
 
-  analyzeDifference(BB, separationTracker);
+  analyzeInterval(BB, intervalAnalyzer);
 
   // Pass secretVars list to child BBs and check them
   const TerminatorInst *tInst = BB->getTerminator();
@@ -117,27 +117,27 @@ void generateCFG (BasicBlock* BB, SeparationTracker* separationTracker, std::sta
           !newLoopCallStack.empty()) {
           // prevent repeating backedge analysis loop
           newBackedgeSwitch = OFF;
-          generateCFG(next, separationTracker, newLoopCallStack, newBackedgeSwitch);
+          generateCFG(next, intervalAnalyzer, newLoopCallStack, newBackedgeSwitch);
       }
       // Terminate looping condition to acheive least fixed point solution
       if (isSameBlock(prevLoopBegin, next)) {
           return;
       }
       // Analyze the next instruction and get all the discovered from that analysis context
-      generateCFG(next, separationTracker, newLoopCallStack, newBackedgeSwitch);
+      generateCFG(next, intervalAnalyzer, newLoopCallStack, newBackedgeSwitch);
   }
 
-  separationTracker->printSeparationReport();
+  intervalAnalyzer->printSeparationReport();
 
   return;
 }
 
-void analyzeDifference (BasicBlock* BB, SeparationTracker* separationTracker) {
+void analyzeInterval (BasicBlock* BB, IntervalAnalyzer* intervalAnalyzer) {
     // Loop through instructions in BB
-    double separation;
+    IntervalAnalyzer::interval_t interval;
     for (auto &I: *BB) {
-        separation = separationTracker->processNewEntry(&I);
-        separationTracker->printSeparationReport();
+        interval = intervalAnalyzer->processNewEntry(&I);
+        intervalAnalyzer->printIntervalReport();
     }
     return;
 }

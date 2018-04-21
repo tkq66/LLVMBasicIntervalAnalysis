@@ -24,6 +24,7 @@ class IntervalTracker {
         // Instance-bound methods
         void* getPtrFromVariableName(std::string name);
         interval_t getVariableInterval(std::string name);
+        double getVariableValue(std::string name);
 
         // Tracker methods
         void printTracker() override;
