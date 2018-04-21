@@ -11,7 +11,7 @@
 #include "llvm/IR/Constants.h"
 #include "ValueTracker.h"
 
-static var_t ValueTracker::getVariableFromPtr(void* ptr) {
+ValueTracker::var_t ValueTracker::getVariableFromPtr(void* ptr) {
     // TODO: Add some error handling if ptr == nullptr
     return *static_cast<var_t*>(ptr);
 }
@@ -54,12 +54,13 @@ void* ValueTracker::processNewEntry(Instruction* i) {
     else if (isa<BinaryOperator>(i)) {
         return processCalculation(dyn_cast<BinaryOperator>(i));
     }
+    return nullptr;
 }
 
 void* ValueTracker::allocateNewVariable(AllocaInst* i) {
     std::string varName;
     if (!i->hasName()) {
-        return;
+        return nullptr;
     }
     varName = i->getName().str();
     var_t variable = std::make_pair(varName, std::nan("inifinity"));
@@ -120,10 +121,10 @@ void* ValueTracker::processCalculation(BinaryOperator* i) {
     var_t variable = calculateArithmetic(i, calculation);
 
     // Returns reference to recently modified entry
-    return getPtrFromVariableName(variable->first);
+    return getPtrFromVariableName(variable.first);
 }
 
-var_t ValueTracker::calculateArithmetic(BinaryOperator* i, arithmetic_function_t callback) {
+ValueTracker::var_t ValueTracker::calculateArithmetic(BinaryOperator* i, arithmetic_function_t callback) {
     double destValue;
     for (auto val = i->value_op_begin(); val != i->value_op_end(); ++val) {
         std::string currentName;

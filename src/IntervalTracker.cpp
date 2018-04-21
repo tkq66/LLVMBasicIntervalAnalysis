@@ -13,14 +13,14 @@
 #include "ValueTracker.h"
 #include "IntervalTracker.h"
 
-var_t IntervalTracker::getVarEntryFromPtr(void* ptr) {
+IntervalTracker::var_t IntervalTracker::getVarEntryFromPtr(void* ptr) {
     // TODO: Add some error handling if ptr == nullptr
     return *static_cast<var_t*>(ptr);
 }
 
 void* IntervalTracker::getPtrFromVariableName(std::string name) {
-    var_it_t variableIterator = variablesTracker.find(name);
-    if (variableIterator == variablesTracker.end()) {
+    var_it_t variableIterator = intervalsTracker.find(name);
+    if (variableIterator == intervalsTracker.end()) {
         return nullptr;
     }
     std::string varName = variableIterator->first;
@@ -30,7 +30,7 @@ void* IntervalTracker::getPtrFromVariableName(std::string name) {
     return elementPtr;
 }
 
-interval_t IntervalTracker::getVariableInterval(std::string name) {
+IntervalTracker::interval_t IntervalTracker::getVariableInterval(std::string name) {
     return (intervalsTracker.find(name) != intervalsTracker.end()) ? intervalsTracker[name] : std::make_tuple(std::nan("-infinity"), std::nan("+infinity"));
 }
 
@@ -58,13 +58,16 @@ void* IntervalTracker::processNewEntry(Instruction* i) {
     else if (isa<BinaryOperator>(i)) {
         return processCalculation(dyn_cast<BinaryOperator>(i));
     }
+    else {
+        return nullptr;
+    }
 }
 
 void* IntervalTracker::allocateNewVariable(AllocaInst* i) {
     void* variablePtr = valueTracker.allocateNewVariable(i);
     ValueTracker::var_t variable = ValueTracker::getVariableFromPtr(variablePtr);
-    std::string varName = variable->first;
-    interval_t varValue = std::make_tuple(std::nan("-infinity"), std::nan("infinity");
+    std::string varName = variable.first;
+    interval_t varValue = std::make_tuple(std::nan("-infinity"), std::nan("infinity"));
     var_t variableInterval = std::make_pair(varName, varValue);
     intervalsTracker.insert(variableInterval);
 
@@ -75,8 +78,8 @@ void* IntervalTracker::allocateNewVariable(AllocaInst* i) {
 void* IntervalTracker::storeValueIntoVariable(StoreInst* i) {
     void* variablePtr = valueTracker.storeValueIntoVariable(i);
     ValueTracker::var_t variable = ValueTracker::getVariableFromPtr(variablePtr);
-    std::string varName = variable->first;
-    interval_t varValue = std::make_tuple(variable->second, variable->second);
+    std::string varName = variable.first;
+    interval_t varValue = std::make_tuple(variable.second, variable.second);
     intervalsTracker[varName] = varValue;
 
     // Returns reference to newly created entry
@@ -86,8 +89,8 @@ void* IntervalTracker::storeValueIntoVariable(StoreInst* i) {
 void* IntervalTracker::loadVariableIntoRegister(LoadInst* i) {
     void* variablePtr = valueTracker.loadVariableIntoRegister(i);
     ValueTracker::var_t variable = ValueTracker::getVariableFromPtr(variablePtr);
-    std::string registerName = variable->first;
-    interval_t varValue = std::make_tuple(variable->second, variable->second);
+    std::string registerName = variable.first;
+    interval_t varValue = std::make_tuple(variable.second, variable.second);
     var_t variableInterval = std::make_pair(registerName, varValue);
     intervalsTracker.insert(variableInterval);
 
@@ -96,7 +99,7 @@ void* IntervalTracker::loadVariableIntoRegister(LoadInst* i) {
 }
 
 void* IntervalTracker::processCalculation(BinaryOperator* i) {
-    void* variablePtr = valueTracker.processCalculation(i);
+    valueTracker.processCalculation(i);
 
     arithmetic_function_t calculation;
     switch (i->getOpcode()) {
@@ -118,122 +121,72 @@ void* IntervalTracker::processCalculation(BinaryOperator* i) {
     var_t variable = calculateArithmetic(i, calculation);
 
     // Returns reference to recently modified entry
-    return getPtrFromVariableName(variable->first);
+    return getPtrFromVariableName(variable.first);
 }
 
-var_t IntervalTracker::calculateArithmetic(BinaryOperator* i, arithmetic_function_t callback) {
+IntervalTracker::var_t IntervalTracker::calculateArithmetic(BinaryOperator* i, arithmetic_function_t callback) {
     interval_t destInterval;
     for (auto val = i->value_op_begin(); val != i->value_op_end(); ++val) {
         std::string currentName;
-        double currentValue;
+        interval_t currentInterval;
         if (val->hasName()) {
             currentName = val->getName().str();
-            currentValue = variablesTracker[currentName];
+            currentInterval = intervalsTracker[currentName];
         }
         else if (ConstantInt* numConstant = dyn_cast<ConstantInt>(*val)) {
-            currentValue = numConstant->getZExtValue();
+            int number = numConstant->getZExtValue();
+            currentInterval = std::make_tuple(number, number);
         }
         else {
             std::stringstream registerValue;
             registerValue << *val;
             currentName = registerValue.str();
-            currentValue = variablesTracker[currentName];
+            currentInterval = intervalsTracker[currentName];
         }
-        destInterval = (val == i->value_op_begin()) ? std::make_tuple(currentValue, currentValue) : callback(destInterval, currentValue);
+        destInterval = (val == i->value_op_begin()) ? currentInterval : callback(destInterval, currentInterval);
     }
     std::string destName = i->getName().str();
-    std::pair<std::string, double> calculatedVariable = std::make_pair(destName, destInterval);
-    variablesTracker.insert(calculatedVariable);
+    var_t calculatedInterval = std::make_pair(destName, destInterval);
+    intervalsTracker.insert(calculatedInterval);
+
+    // Returns reference to recently modified entry
+    return calculatedInterval;
 }
 
-interval_t IntervalTracker::addCallback(interval_t accumulator, double current) {
+IntervalTracker::interval_t IntervalTracker::addCallback(interval_t accumulator, interval_t current) {
     double min = std::get<0>(accumulator);
     double max = std::get<1>(accumulator);
-    double resultMin;
-    double resultMax;
-    if (std::isnan(current)) {
-        resultMin = std::nan("-infinity")
-        resultMax = std::nan("+infinity")
-    }
-    else {
-        if (std::isnan(min)) {
-            resultMin = std::nan("-infinity")
-        }
-        else {
-            resultMin = min + current;
-        }
-        if (std::isnan(max)) {
-            resultMax = std::nan("+infinity")
-        }
-        else {
-            resultMax = max + current;
-        }
-    }
+    double currentMin = std::get<0>(current);
+    double currentMax = std::get<1>(current);
+    double resultMin = (std::isnan(currentMin) || std::isnan(min)) ? std::nan("-infinity") : (min + currentMin);
+    double resultMax = (std::isnan(currentMax) || std::isnan(max)) ? std::nan("+infinity") : (max + currentMax);
     return std::make_tuple(resultMin, resultMax);
 }
 
-interval_t IntervalTracker::subCallback(interval_t accumulator, double current) {
+IntervalTracker::interval_t IntervalTracker::subCallback(interval_t accumulator, interval_t current) {
     double min = std::get<0>(accumulator);
     double max = std::get<1>(accumulator);
-    double resultMin;
-    double resultMax;
-    if (std::isnan(current)) {
-        resultMin = std::nan("-infinity")
-        resultMax = std::nan("+infinity")
-    }
-    else {
-        if (std::isnan(min)) {
-            resultMin = std::nan("-infinity")
-        }
-        else {
-            resultMin = min - current;
-        }
-        if (std::isnan(max)) {
-            resultMax = std::nan("+infinity")
-        }
-        else {
-            resultMax = max - current;
-        }
-    }
+    double currentMin = std::get<0>(current);
+    double currentMax = std::get<1>(current);
+    double resultMin = (std::isnan(currentMin) || std::isnan(min)) ? std::nan("-infinity") : (min - currentMin);
+    double resultMax = (std::isnan(currentMax) || std::isnan(max)) ? std::nan("+infinity") : (max - currentMax);
     return std::make_tuple(resultMin, resultMax);
 }
 
-interval_t IntervalTracker::mulCallback(interval_t accumulator, double current) {
+IntervalTracker::interval_t IntervalTracker::mulCallback(interval_t accumulator, interval_t current) {
     double min = std::get<0>(accumulator);
     double max = std::get<1>(accumulator);
-    double resultMin;
-    double resultMax;
-    if (std::isnan(current)) {
-        resultMin = std::nan("-infinity")
-        resultMax = std::nan("+infinity")
-    }
-    else {
-        if (std::isnan(min)) {
-            resultMin = std::nan("-infinity")
-        }
-        else {
-            resultMin = min * current;
-        }
-        if (std::isnan(max)) {
-            resultMax = std::nan("+infinity")
-        }
-        else {
-            resultMax = max * current;
-        }
-    }
+    double currentMin = std::get<0>(current);
+    double currentMax = std::get<1>(current);
+    double resultMin = (std::isnan(currentMin) || std::isnan(min)) ? std::nan("-infinity") : (min * currentMin);
+    double resultMax = (std::isnan(currentMax) || std::isnan(max)) ? std::nan("+infinity") : (max * currentMax);
     return std::make_tuple(resultMin, resultMax);
 }
 
-interval_t IntervalTracker::sremCallback(interval_t accumulator, double current) {
-    double resultMin;
-    double resultMax;
-    if (std::isnan(current)) {
-        resultMin = std::nan("-infinity")
-        resultMax = std::nan("+infinity")
-    }
-    else {
-        resultMin = 0;
-        resultMax = current;
-    }
+IntervalTracker::interval_t IntervalTracker::sremCallback(interval_t accumulator, interval_t current) {
+    double currentMin = std::get<0>(current);
+    double currentMax = std::get<1>(current);
+    double resultMin = (std::isnan(currentMin)) ? std::nan("-infinity") : 0;
+    double resultMax = (std::isnan(currentMax)) ? std::nan("+infinity") : currentMax;
     return std::make_tuple(resultMin, resultMax);
 }

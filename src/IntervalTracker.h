@@ -4,13 +4,14 @@
 #include <string>
 #include <unordered_map>
 #include <tuple>
+#include <functional>
 #include "Tracker.h"
 #include "ValueTracker.h"
 #include "llvm/IR/Instruction.h"
 
 using namespace llvm;
 
-class IntervalTracker {
+class IntervalTracker : public Tracker {
     public:
         typedef std::tuple<double, double> interval_t;
         typedef std::unordered_map<std::string, interval_t> var_map_t;
@@ -41,10 +42,10 @@ class IntervalTracker {
 
         // Caclulation helpers
         var_t calculateArithmetic(BinaryOperator* i, arithmetic_function_t callback);
-        interval_t addCallback(interval_t accumulator, double current);
-        interval_t subCallback(interval_t accumulator, double current);
-        interval_t mulCallback(interval_t accumulator, double current);
-        interval_t sremCallback(interval_t accumulator, double current);
+        interval_t addCallback(interval_t accumulator, interval_t current);
+        interval_t subCallback(interval_t accumulator, interval_t current);
+        interval_t mulCallback(interval_t accumulator, interval_t current);
+        interval_t sremCallback(interval_t accumulator, interval_t current);
 };
 
 #endif

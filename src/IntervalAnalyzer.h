@@ -15,7 +15,7 @@ class IntervalAnalyzer : public IntervalTracker {
 
     public:
         IntervalAnalyzer(std::string varName);
-        IntervalTracker::interval_t processNewEntry(Instruction *i);
+        IntervalTracker::interval_t processNewInstruction(Instruction *i);
         void printIntervalReport();
         void printIntervalTracker();
         IntervalTracker::interval_t getInterval();

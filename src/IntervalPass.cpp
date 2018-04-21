@@ -127,7 +127,7 @@ void generateCFG (BasicBlock* BB, IntervalAnalyzer* intervalAnalyzer, std::stack
       generateCFG(next, intervalAnalyzer, newLoopCallStack, newBackedgeSwitch);
   }
 
-  intervalAnalyzer->printSeparationReport();
+  intervalAnalyzer->printIntervalReport();
 
   return;
 }
@@ -136,7 +136,7 @@ void analyzeInterval (BasicBlock* BB, IntervalAnalyzer* intervalAnalyzer) {
     // Loop through instructions in BB
     IntervalAnalyzer::interval_t interval;
     for (auto &I: *BB) {
-        interval = intervalAnalyzer->processNewEntry(&I);
+        interval = intervalAnalyzer->processNewInstruction(&I);
         intervalAnalyzer->printIntervalReport();
     }
     return;

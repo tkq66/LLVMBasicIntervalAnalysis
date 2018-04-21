@@ -14,7 +14,7 @@ IntervalAnalyzer::IntervalAnalyzer(std::string varName) {
     interval = std::make_tuple(std::nan("-infinity"), std::nan("+infinity"));
 }
 
-IntervalTracker::interval_t IntervalAnalyzer::processNewEntry(Instruction* i) {
+IntervalTracker::interval_t IntervalAnalyzer::processNewInstruction(Instruction* i) {
     IntervalTracker::processNewEntry(i);
     return getInterval();
 }
