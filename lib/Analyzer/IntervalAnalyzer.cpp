@@ -6,8 +6,8 @@
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Instruction.h"
 #include "llvm/IR/Constants.h"
-#include "IntervalAnalyzer.h"
-#include "IntervalTracker.h"
+#include "../../include/Analyzer/IntervalAnalyzer.h"
+#include "../../include/Tracker/IntervalTracker.h"
 
 IntervalAnalyzer::IntervalAnalyzer(std::string varName) {
     variableName = varName;

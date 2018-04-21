@@ -6,8 +6,8 @@
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Instruction.h"
 #include "llvm/IR/Constants.h"
-#include "SeparationTracker.h"
-#include "ValueTracker.h"
+#include "../../include/Analyzer/SeparationTracker.h"
+#include "../../include/Tracker/ValueTracker.h"
 
 SeparationTracker::SeparationTracker(std::string varNameOne, std::string varNameTwo) {
     variableNames = std::make_tuple(varNameOne, varNameTwo);

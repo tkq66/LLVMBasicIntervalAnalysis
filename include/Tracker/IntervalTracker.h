@@ -5,9 +5,9 @@
 #include <unordered_map>
 #include <tuple>
 #include <functional>
+#include "llvm/IR/Instruction.h"
 #include "Tracker.h"
 #include "ValueTracker.h"
-#include "llvm/IR/Instruction.h"
 
 using namespace llvm;
 

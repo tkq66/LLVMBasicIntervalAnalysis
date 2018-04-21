@@ -9,7 +9,7 @@
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Instruction.h"
 #include "llvm/IR/Constants.h"
-#include "ValueTracker.h"
+#include "../../include/Tracker/ValueTracker.h"
 
 ValueTracker::var_t ValueTracker::getVariableFromPtr(void* ptr) {
     // TODO: Add some error handling if ptr == nullptr
