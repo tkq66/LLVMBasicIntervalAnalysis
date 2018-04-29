@@ -27,7 +27,7 @@ void* ValueTracker::getPtrFromVariableName(std::string name) {
 }
 
 double ValueTracker::getVariableValue(std::string name) {
-    return (variablesTracker.find(name) != variablesTracker.end()) ? variablesTracker[name] : std::nan("inifinity");
+    return (variablesTracker.find(name) != variablesTracker.end()) ? variablesTracker[name] : std::nan("undefined");
 }
 
 void ValueTracker::editVariable(std::string name, double value) {
@@ -58,6 +58,9 @@ void* ValueTracker::processNewEntry(Instruction* i) {
     }
     else if (isa<LoadInst>(i)) {
         return loadVariableIntoRegister(dyn_cast<LoadInst>(i));
+    }
+    else if (isa<CmpInst>(i)) {
+        return compareValues(dyn_cast<CmpInst>(i));
     }
     else if (isa<BinaryOperator>(i)) {
         return processCalculation(dyn_cast<BinaryOperator>(i));
@@ -108,6 +111,49 @@ void* ValueTracker::loadVariableIntoRegister(LoadInst* i) {
     return getPtrFromVariableName(registerString);
 }
 
+void* ValueTracker::compareValues(CmpInst* i) {
+    arithmetic_function_t comparison;
+    switch (i->getPredicate()) {
+        case CmpInst::ICMP_EQ:
+            comparison = std::bind(&ValueTracker::equalToCallback, this, std::placeholders::_1, std::placeholders::_2);
+            break;
+        case CmpInst::ICMP_NE:
+            comparison = std::bind(&ValueTracker::notEqualToCallback, this, std::placeholders::_1, std::placeholders::_2);
+            break;
+        case CmpInst::ICMP_UGT:
+            comparison = std::bind(&ValueTracker::greaterThanCallback, this, std::placeholders::_1, std::placeholders::_2);
+            break;
+        case CmpInst::ICMP_UGE:
+            comparison = std::bind(&ValueTracker::greaterThanOrEqualCallback, this, std::placeholders::_1, std::placeholders::_2);
+            break;
+        case CmpInst::ICMP_ULT:
+            comparison = std::bind(&ValueTracker::lessThanCallback, this, std::placeholders::_1, std::placeholders::_2);
+            break;
+        case CmpInst::ICMP_ULE:
+            comparison = std::bind(&ValueTracker::lessThanOrEqualCallback, this, std::placeholders::_1, std::placeholders::_2);
+            break;
+        case CmpInst::ICMP_SGT:
+            comparison = std::bind(&ValueTracker::greaterThanCallback, this, std::placeholders::_1, std::placeholders::_2);
+            break;
+        case CmpInst::ICMP_SGE:
+            comparison = std::bind(&ValueTracker::greaterThanOrEqualCallback, this, std::placeholders::_1, std::placeholders::_2);
+            break;
+        case CmpInst::ICMP_SLT:
+            comparison = std::bind(&ValueTracker::lessThanCallback, this, std::placeholders::_1, std::placeholders::_2);
+            break;
+        case CmpInst::ICMP_SLE:
+            comparison = std::bind(&ValueTracker::lessThanOrEqualCallback, this, std::placeholders::_1, std::placeholders::_2);
+            break;
+        default:
+            printf("\nCompare Instruction with Predicate %d not supported.\n", i->getPredicate());
+            break;
+    }
+    var_t variable = calculateArithmetic(i, comparison);
+
+    // Returns reference to recently modified entry
+    return getPtrFromVariableName(variable.first);
+}
+
 void* ValueTracker::processCalculation(BinaryOperator* i) {
     arithmetic_function_t calculation;
     switch (i->getOpcode()) {
@@ -132,7 +178,7 @@ void* ValueTracker::processCalculation(BinaryOperator* i) {
     return getPtrFromVariableName(variable.first);
 }
 
-ValueTracker::var_t ValueTracker::calculateArithmetic(BinaryOperator* i, arithmetic_function_t callback) {
+ValueTracker::var_t ValueTracker::calculateArithmetic(Instruction* i, arithmetic_function_t callback) {
     double destValue;
     for (auto val = i->value_op_begin(); val != i->value_op_end(); ++val) {
         std::string currentName;
@@ -196,5 +242,65 @@ double ValueTracker::sremCallback(double accumulator, double current) {
     }
     else {
         return current;
+    }
+}
+
+double ValueTracker::equalToCallback(double accumulator, double current) {
+    if (std::isnan(accumulator) ||
+        std::isnan(current)) {
+        return std::nan("undefined");
+    }
+    else {
+        return (accumulator == current) ? 1.0 : 0.0;
+    }
+}
+
+double ValueTracker::notEqualToCallback(double accumulator, double current) {
+    if (std::isnan(accumulator) ||
+        std::isnan(current)) {
+        return std::nan("undefined");
+    }
+    else {
+        return (accumulator != current) ? 1.0 : 0.0;
+    }
+}
+
+double ValueTracker::greaterThanCallback(double accumulator, double current) {
+    if (std::isnan(accumulator) ||
+        std::isnan(current)) {
+        return std::nan("undefined");
+    }
+    else {
+        return (accumulator > current) ? 1.0 : 0.0;
+    }
+}
+
+double ValueTracker::greaterThanOrEqualCallback(double accumulator, double current) {
+    if (std::isnan(accumulator) ||
+        std::isnan(current)) {
+        return std::nan("undefined");
+    }
+    else {
+        return (accumulator >= current) ? 1.0 : 0.0;
+    }
+}
+
+double ValueTracker::lessThanCallback(double accumulator, double current) {
+    if (std::isnan(accumulator) ||
+        std::isnan(current)) {
+        return std::nan("undefined");
+    }
+    else {
+        return (accumulator < current) ? 1.0 : 0.0;
+    }
+}
+
+double ValueTracker::lessThanOrEqualCallback(double accumulator, double current) {
+    if (std::isnan(accumulator) ||
+        std::isnan(current)) {
+        return std::nan("undefined");
+    }
+    else {
+        return (accumulator <= current) ? 1.0 : 0.0;
     }
 }

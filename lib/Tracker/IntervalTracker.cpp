@@ -76,6 +76,9 @@ void* IntervalTracker::processNewEntry(Instruction* i) {
     else if (isa<LoadInst>(i)) {
         return loadVariableIntoRegister(dyn_cast<LoadInst>(i));
     }
+    else if (isa<CmpInst>(i)) {
+        return compareValues(dyn_cast<CmpInst>(i));
+    }
     else if (isa<BinaryOperator>(i)) {
         return processCalculation(dyn_cast<BinaryOperator>(i));
     }
@@ -119,6 +122,10 @@ void* IntervalTracker::loadVariableIntoRegister(LoadInst* i) {
     return getPtrFromVariableName(registerName);
 }
 
+void* IntervalTracker::compareValues(CmpInst* i) {
+    return valueTracker.compareValues(i);
+}
+
 void* IntervalTracker::processCalculation(BinaryOperator* i) {
     valueTracker.processCalculation(i);
 
@@ -145,7 +152,7 @@ void* IntervalTracker::processCalculation(BinaryOperator* i) {
     return getPtrFromVariableName(variable.first);
 }
 
-IntervalTracker::var_t IntervalTracker::calculateArithmetic(BinaryOperator* i, arithmetic_function_t callback) {
+IntervalTracker::var_t IntervalTracker::calculateArithmetic(Instruction* i, arithmetic_function_t callback) {
     interval_t destInterval;
     for (auto val = i->value_op_begin(); val != i->value_op_end(); ++val) {
         std::string currentName;

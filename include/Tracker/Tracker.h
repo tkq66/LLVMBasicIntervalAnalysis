@@ -14,6 +14,7 @@ class Tracker {
         virtual void* allocateNewVariable(AllocaInst* i) = 0;
         virtual void* storeValueIntoVariable(StoreInst* i) = 0;
         virtual void* loadVariableIntoRegister(LoadInst* i) = 0;
+        virtual void* compareValues(CmpInst* i) = 0;
         virtual void* processCalculation(BinaryOperator* i) = 0;
 };
 

@@ -32,6 +32,7 @@ class ValueTracker : public Tracker {
         void* allocateNewVariable(AllocaInst* i) override;
         void* storeValueIntoVariable(StoreInst* i) override;
         void* loadVariableIntoRegister(LoadInst* i) override;
+        void* compareValues(CmpInst* i) override;
         void* processCalculation(BinaryOperator* i) override;
 
     private:
@@ -39,11 +40,17 @@ class ValueTracker : public Tracker {
         var_map_t variablesTracker;
 
         // Caclulation helpers
-        var_t calculateArithmetic(BinaryOperator* i, arithmetic_function_t callback);
+        var_t calculateArithmetic(Instruction* i, arithmetic_function_t callback);
         double addCallback(double accumulator, double current);
         double subCallback(double accumulator, double current);
         double mulCallback(double accumulator, double current);
         double sremCallback(double accumulator, double current);
+        double equalToCallback(double accumulator, double current);
+        double notEqualToCallback(double accumulator, double current);
+        double greaterThanCallback(double accumulator, double current);
+        double greaterThanOrEqualCallback(double accumulator, double current);
+        double lessThanCallback(double accumulator, double current);
+        double lessThanOrEqualCallback(double accumulator, double current);
 };
 
 #endif

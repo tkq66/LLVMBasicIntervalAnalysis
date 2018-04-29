@@ -38,6 +38,7 @@ class IntervalTracker : public Tracker {
         void* allocateNewVariable(AllocaInst* i) override;
         void* storeValueIntoVariable(StoreInst* i) override;
         void* loadVariableIntoRegister(LoadInst* i) override;
+        void* compareValues(CmpInst* i) override;
         void* processCalculation(BinaryOperator* i) override;
 
     private:
@@ -46,7 +47,7 @@ class IntervalTracker : public Tracker {
         var_map_t intervalsTracker;
 
         // Caclulation helpers
-        var_t calculateArithmetic(BinaryOperator* i, arithmetic_function_t callback);
+        var_t calculateArithmetic(Instruction* i, arithmetic_function_t callback);
         interval_t addCallback(interval_t accumulator, interval_t current);
         interval_t subCallback(interval_t accumulator, interval_t current);
         interval_t mulCallback(interval_t accumulator, interval_t current);

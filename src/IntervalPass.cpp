@@ -47,7 +47,7 @@ enum AnalyzeLoopBackedgeSwtch {
 };
 
 IntervalTracker::var_map_t generateCFG (BasicBlock*, IntervalAnalyzer* intervalAnalyzer, std::stack<BasicBlock*>, AnalyzeLoopBackedgeSwtch, std::string);
-IntervalTracker::interval_t analyzeInterval (BasicBlock*, IntervalAnalyzer* intervalAnalyzer);
+IntervalAnalyzer* analyzeInterval (BasicBlock*, IntervalAnalyzer* intervalAnalyzer);
 IntervalTracker::var_map_t getLeafNodes(IntervalTracker::var_map_t);
 void printIntervalReport(IntervalTracker::var_map_t);
 bool isSameBlock (BasicBlock*, BasicBlock*);
@@ -113,15 +113,25 @@ IntervalTracker::var_map_t generateCFG (BasicBlock* BB,
       newBackedgeSwitch = ON;
   }
 
-  IntervalTracker::interval_t interval = analyzeInterval(BB, intervalAnalyzer);
+  IntervalAnalyzer* newIntervalAnalyzer = analyzeInterval(BB, intervalAnalyzer);
+  IntervalTracker::interval_t interval = newIntervalAnalyzer->getUpdatedInterval();
   IntervalTracker::var_map_t intervalEndpointTracker({{contextName, interval}});
 
   // Pass secretVars list to child BBs and check them
   const TerminatorInst *tInst = BB->getTerminator();
   int branchCount = tInst->getNumSuccessors();
 
+  // Get the comparator variable to determine which branch to skip
+  std::string branchComparatorName = tInst->getOperand(0)->getName().str();
+  double branchComparatorValue = newIntervalAnalyzer->getVariableValue(branchComparatorName);
+
   for (int i = 0;  i < branchCount; ++i) {
-      printf("\n");
+      // Skip branch based on condition
+      if (!std::isnan(branchComparatorValue) &&
+          (i == branchComparatorValue)) {
+              continue;
+      }
+
       BasicBlock *next = tInst->getSuccessor(i);
       BasicBlock *prevLoopBegin = !newLoopCallStack.empty() ? newLoopCallStack.top() : nullptr;
 
@@ -154,14 +164,15 @@ IntervalTracker::var_map_t generateCFG (BasicBlock* BB,
   return intervalEndpointTracker;
 }
 
-IntervalTracker::interval_t analyzeInterval (BasicBlock* BB, IntervalAnalyzer* intervalAnalyzer) {
+IntervalAnalyzer* analyzeInterval (BasicBlock* BB, IntervalAnalyzer* intervalAnalyzer) {
     // Loop through instructions in BB
     IntervalAnalyzer::interval_t interval;
     for (auto &I: *BB) {
+        printf("Opcode name: %s\n", I.getOpcodeName());
         interval = intervalAnalyzer->processNewInstruction(&I);
         intervalAnalyzer->printIntervalReport();
     }
-    return intervalAnalyzer->getUpdatedInterval();
+    return intervalAnalyzer;
 }
 
 IntervalTracker::var_map_t getLeafNodes(IntervalTracker::var_map_t intervals) {
