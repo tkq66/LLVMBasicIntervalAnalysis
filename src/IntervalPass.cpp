@@ -119,7 +119,7 @@ void generateCFG (BasicBlock* BB, IntervalAnalyzer* intervalAnalyzer, std::stack
           !newLoopCallStack.empty()) {
           // prevent repeating backedge analysis loop
           newBackedgeSwitch = OFF;
-          generateCFG(next, intervalAnalyzer, newLoopCallStack, newBackedgeSwitch);
+          generateCFG(prevLoopBegin, intervalAnalyzer, newLoopCallStack, newBackedgeSwitch);
       }
       // Terminate looping condition to acheive least fixed point solution
       if (isSameBlock(prevLoopBegin, next)) {
