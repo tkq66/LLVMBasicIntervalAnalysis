@@ -116,7 +116,12 @@ void* IntervalTracker::loadVariableIntoRegister(LoadInst* i) {
     std::string registerName = variable.first;
     interval_t varValue = std::make_tuple(variable.second, variable.second);
     var_t variableInterval = std::make_pair(registerName, varValue);
-    intervalsTracker.insert(variableInterval);
+    if (intervalsTracker.find(registerName) == intervalsTracker.end()) {
+        intervalsTracker.insert(variableInterval);
+    }
+    else {
+        intervalsTracker[registerName] = varValue;
+    }
 
     // Returns reference to recently added register entry
     return getPtrFromVariableName(registerName);
@@ -175,7 +180,12 @@ IntervalTracker::var_t IntervalTracker::calculateArithmetic(Instruction* i, arit
     }
     std::string destName = i->getName().str();
     var_t calculatedInterval = std::make_pair(destName, destInterval);
-    intervalsTracker.insert(calculatedInterval);
+    if (intervalsTracker.find(destName) == intervalsTracker.end()) {
+        intervalsTracker.insert(calculatedInterval);
+    }
+    else {
+        intervalsTracker[destName] = destInterval;
+    }
 
     // Returns reference to recently modified entry
     return calculatedInterval;

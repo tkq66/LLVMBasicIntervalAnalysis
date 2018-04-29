@@ -46,7 +46,9 @@ enum AnalyzeLoopBackedgeSwtch {
     OFF
 };
 
-IntervalTracker::var_map_t generateCFG (BasicBlock*, IntervalAnalyzer* intervalAnalyzer, std::stack<BasicBlock*>, AnalyzeLoopBackedgeSwtch, std::string);
+typedef std::tuple<IntervalTracker::var_map_t, IntervalAnalyzer> analysis_package_t;
+
+analysis_package_t generateCFG (BasicBlock*, IntervalAnalyzer* intervalAnalyzer, std::stack<BasicBlock*>, AnalyzeLoopBackedgeSwtch, std::string);
 IntervalAnalyzer* analyzeInterval (BasicBlock*, IntervalAnalyzer* intervalAnalyzer);
 IntervalTracker::var_map_t getLeafNodes(IntervalTracker::var_map_t);
 void printIntervalReport(IntervalTracker::var_map_t);
@@ -75,7 +77,8 @@ int main (int argc, char **argv) {
             BasicBlock* BB = dyn_cast<BasicBlock>(F.begin());
             std::stack<BasicBlock*> loopCallStack;
 
-            IntervalTracker::var_map_t variableIntervalEndpoints = generateCFG(BB, intervalAnalyzer, loopCallStack, ON, "main");
+            analysis_package_t analysisPackage = generateCFG(BB, intervalAnalyzer, loopCallStack, ON, "main");
+            IntervalTracker::var_map_t variableIntervalEndpoints = std::get<0>(analysisPackage);
             IntervalTracker::var_map_t variableIntervalLeafNodes = getLeafNodes(variableIntervalEndpoints);
             printf("\nVar: %s Interval Report\n", argv[2]);
             printIntervalReport(variableIntervalEndpoints);
@@ -89,11 +92,11 @@ int main (int argc, char **argv) {
 }
 
 
-IntervalTracker::var_map_t generateCFG (BasicBlock* BB,
-                                        IntervalAnalyzer* intervalAnalyzer,
-                                        std::stack<BasicBlock*> loopCallStack,
-                                        AnalyzeLoopBackedgeSwtch backedgeSwitch,
-                                        std::string parentContextName) {
+analysis_package_t generateCFG (BasicBlock* BB,
+                                IntervalAnalyzer* intervalAnalyzer,
+                                std::stack<BasicBlock*> loopCallStack,
+                                AnalyzeLoopBackedgeSwtch backedgeSwitch,
+                                std::string parentContextName) {
   const char *blockName = BB->getName().str().c_str();
   std::string contextName = parentContextName + DEPTH_SEPARATOR + blockName;
   printf("Label Name:%s\n", blockName);
@@ -125,6 +128,8 @@ IntervalTracker::var_map_t generateCFG (BasicBlock* BB,
   std::string branchComparatorName = tInst->getOperand(0)->getName().str();
   double branchComparatorValue = newIntervalAnalyzer->getVariableValue(branchComparatorName);
 
+  printf("\n");
+  IntervalAnalyzer propagatedIntervalAnalyzer(*newIntervalAnalyzer);
   for (int i = 0;  i < branchCount; ++i) {
       // Skip branch based on condition
       if (!std::isnan(branchComparatorValue) &&
@@ -138,7 +143,7 @@ IntervalTracker::var_map_t generateCFG (BasicBlock* BB,
       // If still analyzing loop backedge and the loop is going past the calling point, stop this recursion
       if (isEndLoop(next->getName().str().c_str()) &&
           (newBackedgeSwitch == OFF)) {
-          return intervalEndpointTracker;
+          return std::make_tuple(intervalEndpointTracker, propagatedIntervalAnalyzer);
       }
       // Analyze loop backedge by running through the loop one more time before ending
       // to complete taint analysis of variable dependencies
@@ -147,28 +152,30 @@ IntervalTracker::var_map_t generateCFG (BasicBlock* BB,
           !newLoopCallStack.empty()) {
           // prevent repeating backedge analysis loop
           newBackedgeSwitch = OFF;
-          IntervalTracker::var_map_t intervalEndpoint = generateCFG(prevLoopBegin, intervalAnalyzer, newLoopCallStack, newBackedgeSwitch, contextName);
+          analysis_package_t analysisPackage = generateCFG(prevLoopBegin, &propagatedIntervalAnalyzer, newLoopCallStack, newBackedgeSwitch, contextName);
+          IntervalTracker::var_map_t intervalEndpoint = std::get<0>(analysisPackage);
           intervalEndpointTracker.insert(intervalEndpoint.begin(), intervalEndpoint.end());
       }
       // Terminate looping condition to acheive least fixed point solution
       if (isSameBlock(prevLoopBegin, next)) {
-          return intervalEndpointTracker;
+          return std::make_tuple(intervalEndpointTracker, propagatedIntervalAnalyzer);
       }
       // Analyze the next instruction and get all the discovered from that analysis context,
       // isolating the consequence of the analyzer in that context from the outer context
-      IntervalAnalyzer* newIntervalAnalyzer = new IntervalAnalyzer(*intervalAnalyzer);
-      IntervalTracker::var_map_t intervalEndpoint = generateCFG(next, newIntervalAnalyzer, newLoopCallStack, newBackedgeSwitch, contextName);
+      IntervalAnalyzer* subIntervalAnalyzer = new IntervalAnalyzer(*newIntervalAnalyzer);
+      analysis_package_t analysisPackage = generateCFG(next, subIntervalAnalyzer, newLoopCallStack, newBackedgeSwitch, contextName);
+      IntervalTracker::var_map_t intervalEndpoint = std::get<0>(analysisPackage);
+      propagatedIntervalAnalyzer = IntervalAnalyzer(std::get<1>(analysisPackage));
       intervalEndpointTracker.insert(intervalEndpoint.begin(), intervalEndpoint.end());
   }
 
-  return intervalEndpointTracker;
+  return std::make_tuple(intervalEndpointTracker, propagatedIntervalAnalyzer);
 }
 
 IntervalAnalyzer* analyzeInterval (BasicBlock* BB, IntervalAnalyzer* intervalAnalyzer) {
     // Loop through instructions in BB
     IntervalAnalyzer::interval_t interval;
     for (auto &I: *BB) {
-        printf("Opcode name: %s\n", I.getOpcodeName());
         interval = intervalAnalyzer->processNewInstruction(&I);
         intervalAnalyzer->printIntervalReport();
     }

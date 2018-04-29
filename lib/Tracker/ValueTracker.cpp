@@ -105,7 +105,12 @@ void* ValueTracker::loadVariableIntoRegister(LoadInst* i) {
     registerValue << (void*)i;
     std::string registerString = registerValue.str();
     var_t registerVariable = std::make_pair(registerString, variableValue);
-    variablesTracker.insert(registerVariable);
+    if (variablesTracker.find(registerString) == variablesTracker.end()) {
+        variablesTracker.insert(registerVariable);
+    }
+    else {
+        variablesTracker[registerString] = variableValue;
+    }
 
     // Returns reference to recently added register entry
     return getPtrFromVariableName(registerString);
@@ -200,7 +205,12 @@ ValueTracker::var_t ValueTracker::calculateArithmetic(Instruction* i, arithmetic
     }
     std::string destName = i->getName().str();
     var_t calculatedVariable = std::make_pair(destName, destValue);
-    variablesTracker.insert(calculatedVariable);
+    if (variablesTracker.find(destName) == variablesTracker.end()) {
+        variablesTracker.insert(calculatedVariable);
+    }
+    else {
+        variablesTracker[destName] = destValue;
+    }
 
     // Returns reference to recently modified entry
     return calculatedVariable;
