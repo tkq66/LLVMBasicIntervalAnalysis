@@ -8,15 +8,25 @@
 #include "llvm/IR/Constants.h"
 #include "../../include/Analyzer/IntervalAnalyzer.h"
 #include "../../include/Tracker/IntervalTracker.h"
+#include "../../include/Tracker/ValueTracker.h"
 
 IntervalAnalyzer::IntervalAnalyzer(std::string varName) {
     variableName = varName;
     interval = std::make_tuple(std::nan("-infinity"), std::nan("+infinity"));
 }
 
+IntervalAnalyzer::IntervalAnalyzer(const IntervalAnalyzer& intervalAnalyzer) {
+    variableName = intervalAnalyzer.getVariableName();
+    interval = IntervalTracker::interval_t(intervalAnalyzer.getInterval());
+    ValueTracker::var_map_t vTracker = intervalAnalyzer.IntervalTracker::getValueTracker();
+    IntervalTracker::var_map_t iTracker = intervalAnalyzer.IntervalTracker::getIntervalsTracker();
+    IntervalTracker::setTracker(iTracker, vTracker);
+}
+
 IntervalTracker::interval_t IntervalAnalyzer::processNewInstruction(Instruction* i) {
     IntervalTracker::processNewEntry(i);
-    return getInterval();
+    interval = getUpdatedInterval();
+    return interval;
 }
 
 void IntervalAnalyzer::printIntervalReport() {
@@ -37,7 +47,14 @@ void IntervalAnalyzer::printIntervalTracker() {
     IntervalTracker::printTracker();
 }
 
-IntervalTracker::interval_t IntervalAnalyzer::getInterval() {
-    interval = IntervalTracker::getVariableInterval(variableName);
+std::string IntervalAnalyzer::getVariableName() const {
+    return variableName;
+}
+
+IntervalTracker::interval_t IntervalAnalyzer::getInterval() const {
     return interval;
+}
+
+IntervalTracker::interval_t IntervalAnalyzer::getUpdatedInterval() {
+    return IntervalTracker::interval_t(IntervalTracker::getVariableInterval(variableName));
 }

@@ -24,8 +24,13 @@ class IntervalTracker : public Tracker {
 
         // Instance-bound methods
         void* getPtrFromVariableName(std::string name);
-        interval_t getVariableInterval(std::string name);
+        interval_t getVariableInterval(std::string name) const;
         double getVariableValue(std::string name);
+        var_map_t getIntervalsTracker() const;
+        ValueTracker::var_map_t getValueTracker() const;
+        void setTracker(ValueTracker::var_map_t tracker);
+        void setTracker(IntervalTracker::var_map_t tracker);
+        void setTracker(IntervalTracker::var_map_t iTracker, ValueTracker::var_map_t vTracker);
 
         // Tracker methods
         void printTracker() override;

@@ -22,6 +22,7 @@
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/raw_ostream.h"
 #include "../include/Analyzer/IntervalAnalyzer.h"
+#include "../include/Tracker/IntervalTracker.h"
 
 #define ANSI_COLOR_RED     "\x1b[31m"
 #define ANSI_COLOR_GREEN   "\x1b[32m"
@@ -102,6 +103,7 @@ void generateCFG (BasicBlock* BB, IntervalAnalyzer* intervalAnalyzer, std::stack
   int branchCount = tInst->getNumSuccessors();
 
   for (int i = 0;  i < branchCount; ++i) {
+      printf("\n");
       BasicBlock *next = tInst->getSuccessor(i);
       BasicBlock *prevLoopBegin = !newLoopCallStack.empty() ? newLoopCallStack.top() : nullptr;
 
@@ -123,11 +125,13 @@ void generateCFG (BasicBlock* BB, IntervalAnalyzer* intervalAnalyzer, std::stack
       if (isSameBlock(prevLoopBegin, next)) {
           return;
       }
-      // Analyze the next instruction and get all the discovered from that analysis context
-      generateCFG(next, intervalAnalyzer, newLoopCallStack, newBackedgeSwitch);
+      // Analyze the next instruction and get all the discovered from that analysis context,
+      // isolating the consequence of the analyzer in that context from the outer context
+      IntervalAnalyzer* newIntervalAnalyzer = new IntervalAnalyzer(*intervalAnalyzer);
+      generateCFG(next, newIntervalAnalyzer, newLoopCallStack, newBackedgeSwitch);
   }
 
-  intervalAnalyzer->printIntervalReport();
+  // intervalAnalyzer->printIntervalReport();
 
   return;
 }

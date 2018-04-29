@@ -23,6 +23,8 @@ class ValueTracker : public Tracker {
         void* getPtrFromVariableName(std::string name);
         double getVariableValue(std::string name);
         void editVariable(std::string name, double value);
+        var_map_t getValueTracker() const;
+        void setTracker(var_map_t tracker);
 
         // Tracker methods
         void printTracker() override;

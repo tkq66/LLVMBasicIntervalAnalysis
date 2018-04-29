@@ -4,6 +4,7 @@
 #include <string>
 #include <tuple>
 #include "llvm/IR/Instruction.h"
+#include "../Tracker/ValueTracker.h"
 #include "../Tracker/IntervalTracker.h"
 
 using namespace llvm;
@@ -15,10 +16,13 @@ class IntervalAnalyzer : public IntervalTracker {
 
     public:
         IntervalAnalyzer(std::string varName);
+        IntervalAnalyzer(const IntervalAnalyzer& intervalAnalyzer);
         IntervalTracker::interval_t processNewInstruction(Instruction *i);
         void printIntervalReport();
         void printIntervalTracker();
-        IntervalTracker::interval_t getInterval();
+        std::string getVariableName() const;
+        IntervalTracker::interval_t getInterval() const;
+        IntervalTracker::interval_t getUpdatedInterval();
 };
 
 #endif

@@ -34,6 +34,14 @@ void ValueTracker::editVariable(std::string name, double value) {
     variablesTracker[name] = value;
 }
 
+ValueTracker::var_map_t ValueTracker::getValueTracker() const {
+    return variablesTracker;
+}
+
+void ValueTracker::setTracker(var_map_t tracker) {
+    variablesTracker = var_map_t(tracker);
+}
+
 void ValueTracker::printTracker() {
     for (auto variable = variablesTracker.begin(); variable != variablesTracker.end(); ++variable) {
         printf("Key: %s - Value: %lf\n", variable->first.c_str(), variable->second);

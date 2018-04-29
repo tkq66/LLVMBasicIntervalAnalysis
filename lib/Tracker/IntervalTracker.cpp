@@ -30,12 +30,33 @@ void* IntervalTracker::getPtrFromVariableName(std::string name) {
     return elementPtr;
 }
 
-IntervalTracker::interval_t IntervalTracker::getVariableInterval(std::string name) {
-    return (intervalsTracker.find(name) != intervalsTracker.end()) ? intervalsTracker[name] : std::make_tuple(std::nan("-infinity"), std::nan("+infinity"));
+IntervalTracker::interval_t IntervalTracker::getVariableInterval(std::string name) const {
+    return (intervalsTracker.find(name) != intervalsTracker.end()) ? intervalsTracker.find(name)->second : std::make_tuple(std::nan("-infinity"), std::nan("+infinity"));
 }
 
 double IntervalTracker::getVariableValue(std::string name) {
     return valueTracker.getVariableValue(name);
+}
+
+IntervalTracker::var_map_t IntervalTracker::getIntervalsTracker() const {
+    return intervalsTracker;
+}
+
+ValueTracker::var_map_t IntervalTracker::getValueTracker() const {
+    return valueTracker.getValueTracker();
+}
+
+void IntervalTracker::setTracker(ValueTracker::var_map_t tracker) {
+    valueTracker.setTracker(tracker);
+}
+
+void IntervalTracker::setTracker(IntervalTracker::var_map_t tracker) {
+    intervalsTracker = var_map_t(tracker);
+}
+
+void IntervalTracker::setTracker(IntervalTracker::var_map_t iTracker, ValueTracker::var_map_t vTracker) {
+    setTracker(iTracker);
+    setTracker(vTracker);
 }
 
 void IntervalTracker::printTracker() {

@@ -5,5 +5,10 @@ int main() {
         x = 3 + b;
     else
         x = 3 - b;
+
+    if (a > 10)
+        x = 3 + x;
+    else
+        x = 3 - x;
     return x;
 }
