@@ -7,8 +7,10 @@
  *  Modified by Teekayu Klongtruajrok (A0174348X)
  *  Contact: e0210381@u.nus.edu
  */
+#include <algorithm>
 #include <cstdio>
 #include <iostream>
+#include <unordered_map>
 #include <set>
 #include <stack>
 #include <sstream>
@@ -32,6 +34,7 @@
 #define ANSI_COLOR_CYAN    "\x1b[36m"
 #define ANSI_COLOR_RESET   "\x1b[0m"
 
+#define DEPTH_SEPARATOR '/'
 #define MAIN_FUNCTION "main"
 #define LOOP_BEGIN_BLOCK_NAME "while.cond"
 #define LOOP_END_BLOCK_NAME "while.end"
@@ -43,8 +46,10 @@ enum AnalyzeLoopBackedgeSwtch {
     OFF
 };
 
-void generateCFG (BasicBlock*, IntervalAnalyzer* intervalAnalyzer, std::stack<BasicBlock*>, AnalyzeLoopBackedgeSwtch);
-void analyzeInterval (BasicBlock*, IntervalAnalyzer* intervalAnalyzer);
+IntervalTracker::var_map_t generateCFG (BasicBlock*, IntervalAnalyzer* intervalAnalyzer, std::stack<BasicBlock*>, AnalyzeLoopBackedgeSwtch, std::string);
+IntervalTracker::interval_t analyzeInterval (BasicBlock*, IntervalAnalyzer* intervalAnalyzer);
+IntervalTracker::var_map_t getLeafNodes(IntervalTracker::var_map_t);
+void printIntervalReport(IntervalTracker::var_map_t);
 bool isSameBlock (BasicBlock*, BasicBlock*);
 bool isMainFunction (const char*);
 bool isBeginLoop (const char*);
@@ -69,7 +74,14 @@ int main (int argc, char **argv) {
         if (isMainFunction(F.getName().str().c_str())) {
             BasicBlock* BB = dyn_cast<BasicBlock>(F.begin());
             std::stack<BasicBlock*> loopCallStack;
-            generateCFG(BB, intervalAnalyzer, loopCallStack, ON);
+
+            IntervalTracker::var_map_t variableIntervalEndpoints = generateCFG(BB, intervalAnalyzer, loopCallStack, ON, "main");
+            IntervalTracker::var_map_t variableIntervalLeafNodes = getLeafNodes(variableIntervalEndpoints);
+            printf("\nVar: %s Interval Report\n", argv[2]);
+            printIntervalReport(variableIntervalEndpoints);
+            printf("\n");
+            printf("\n");
+            printIntervalReport(variableIntervalLeafNodes);
         }
     }
 
@@ -77,8 +89,13 @@ int main (int argc, char **argv) {
 }
 
 
-void generateCFG (BasicBlock* BB, IntervalAnalyzer* intervalAnalyzer, std::stack<BasicBlock*> loopCallStack, AnalyzeLoopBackedgeSwtch backedgeSwitch) {
+IntervalTracker::var_map_t generateCFG (BasicBlock* BB,
+                                        IntervalAnalyzer* intervalAnalyzer,
+                                        std::stack<BasicBlock*> loopCallStack,
+                                        AnalyzeLoopBackedgeSwtch backedgeSwitch,
+                                        std::string parentContextName) {
   const char *blockName = BB->getName().str().c_str();
+  std::string contextName = parentContextName + DEPTH_SEPARATOR + blockName;
   printf("Label Name:%s\n", blockName);
 
   // Create local copies of parameters that can be updated
@@ -96,7 +113,8 @@ void generateCFG (BasicBlock* BB, IntervalAnalyzer* intervalAnalyzer, std::stack
       newBackedgeSwitch = ON;
   }
 
-  analyzeInterval(BB, intervalAnalyzer);
+  IntervalTracker::interval_t interval = analyzeInterval(BB, intervalAnalyzer);
+  IntervalTracker::var_map_t intervalEndpointTracker({{contextName, interval}});
 
   // Pass secretVars list to child BBs and check them
   const TerminatorInst *tInst = BB->getTerminator();
@@ -110,7 +128,7 @@ void generateCFG (BasicBlock* BB, IntervalAnalyzer* intervalAnalyzer, std::stack
       // If still analyzing loop backedge and the loop is going past the calling point, stop this recursion
       if (isEndLoop(next->getName().str().c_str()) &&
           (newBackedgeSwitch == OFF)) {
-          return;
+          return intervalEndpointTracker;
       }
       // Analyze loop backedge by running through the loop one more time before ending
       // to complete taint analysis of variable dependencies
@@ -119,31 +137,63 @@ void generateCFG (BasicBlock* BB, IntervalAnalyzer* intervalAnalyzer, std::stack
           !newLoopCallStack.empty()) {
           // prevent repeating backedge analysis loop
           newBackedgeSwitch = OFF;
-          generateCFG(prevLoopBegin, intervalAnalyzer, newLoopCallStack, newBackedgeSwitch);
+          IntervalTracker::var_map_t intervalEndpoint = generateCFG(prevLoopBegin, intervalAnalyzer, newLoopCallStack, newBackedgeSwitch, contextName);
+          intervalEndpointTracker.insert(intervalEndpoint.begin(), intervalEndpoint.end());
       }
       // Terminate looping condition to acheive least fixed point solution
       if (isSameBlock(prevLoopBegin, next)) {
-          return;
+          return intervalEndpointTracker;
       }
       // Analyze the next instruction and get all the discovered from that analysis context,
       // isolating the consequence of the analyzer in that context from the outer context
       IntervalAnalyzer* newIntervalAnalyzer = new IntervalAnalyzer(*intervalAnalyzer);
-      generateCFG(next, newIntervalAnalyzer, newLoopCallStack, newBackedgeSwitch);
+      IntervalTracker::var_map_t intervalEndpoint = generateCFG(next, newIntervalAnalyzer, newLoopCallStack, newBackedgeSwitch, contextName);
+      intervalEndpointTracker.insert(intervalEndpoint.begin(), intervalEndpoint.end());
   }
 
-  // intervalAnalyzer->printIntervalReport();
-
-  return;
+  return intervalEndpointTracker;
 }
 
-void analyzeInterval (BasicBlock* BB, IntervalAnalyzer* intervalAnalyzer) {
+IntervalTracker::interval_t analyzeInterval (BasicBlock* BB, IntervalAnalyzer* intervalAnalyzer) {
     // Loop through instructions in BB
     IntervalAnalyzer::interval_t interval;
     for (auto &I: *BB) {
         interval = intervalAnalyzer->processNewInstruction(&I);
         intervalAnalyzer->printIntervalReport();
     }
-    return;
+    return intervalAnalyzer->getUpdatedInterval();
+}
+
+IntervalTracker::var_map_t getLeafNodes(IntervalTracker::var_map_t intervals) {
+    int maxDepth = 0;
+    for (auto& it :  intervals) {
+        std::string contextName = it.first;
+        size_t n = std::count(contextName.begin(), contextName.end(), DEPTH_SEPARATOR);
+        int depth = static_cast<int>(n);
+        maxDepth = (maxDepth < depth) ? depth : maxDepth;
+    }
+
+    IntervalTracker::var_map_t leafNodes;
+    for (auto& it :  intervals) {
+        std::string contextName = it.first;
+        size_t n = std::count(contextName.begin(), contextName.end(), DEPTH_SEPARATOR);
+        int depth = static_cast<int>(n);
+        if (depth == maxDepth) {
+            leafNodes.insert(it);
+        }
+    }
+    return leafNodes;
+}
+
+void printIntervalReport(IntervalTracker::var_map_t intervals) {
+    printf("\n");
+    for (auto& it :  intervals) {
+        std::string contextName = it.first;
+        double min = std::get<0>(it.second);
+        double max = std::get<1>(it.second);
+        printf("Context: %s - [ %lf , %lf ]\n", contextName.c_str(), min, max);
+    }
+    printf("\n");
 }
 
 bool isSameBlock (BasicBlock* blockA, BasicBlock* blockB) {
