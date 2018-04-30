@@ -59,6 +59,14 @@ void IntervalTracker::setTracker(IntervalTracker::var_map_t iTracker, ValueTrack
     setTracker(vTracker);
 }
 
+void IntervalTracker::switchLoopState(bool state) {
+    loopState = state;
+}
+
+bool IntervalTracker::isInLoop() const {
+    return loopState;
+}
+
 void IntervalTracker::printTracker() {
     for (auto variable = intervalsTracker.begin(); variable != intervalsTracker.end(); ++variable) {
         printf("Key: %s - [ %lf , %lf ]\n", variable->first.c_str(), std::get<0>(variable->second), std::get<1>(variable->second));
@@ -100,14 +108,35 @@ void* IntervalTracker::allocateNewVariable(AllocaInst* i) {
 }
 
 void* IntervalTracker::storeValueIntoVariable(StoreInst* i) {
-    void* variablePtr = valueTracker.storeValueIntoVariable(i);
-    ValueTracker::var_t variable = ValueTracker::getVariableFromPtr(variablePtr);
-    std::string varName = variable.first;
-    interval_t varValue = std::make_tuple(variable.second, variable.second);
-    intervalsTracker[varName] = varValue;
+    valueTracker.storeValueIntoVariable(i);
+    interval_t src;
+    if (i->getOperand(0)->hasName()) {
+        var_map_t::const_iterator existingVariable = intervalsTracker.find(i->getOperand(0)->getName().str());
+        src = existingVariable->second;
+    }
+    else {
+        ConstantInt* ci = dyn_cast<ConstantInt>(i->getOperand(0));
+        int constant = ci->getSExtValue();
+        src = std::make_tuple(constant, constant);
+    }
+    std::string dest = i->getOperand(1)->getName().str();
 
-    // Returns reference to newly created entry
-    return getPtrFromVariableName(varName);
+    if (!isInLoop()) {
+        intervalsTracker[dest] = src;
+    }
+    else {
+        interval_t destInterval = intervalsTracker.find(dest)->second;
+        double destMin = std::get<0>(destInterval);
+        double destMax = std::get<1>(destInterval);
+        double srcMin = std::get<0>(src);
+        double srcMax = std::get<1>(src);
+        double resultMin = ((std::isnan(destMin) && std::isnan(srcMin)) || (!std::isnan(destMin) && std::isnan(srcMin))) ? std::nan("-infinity") : ((destMin < srcMin) ? destMin: srcMin);
+        double resultMax = ((std::isnan(destMax) && std::isnan(srcMax)) || (!std::isnan(destMax) && std::isnan(srcMax))) ? std::nan("+infinity") : ((destMax > srcMax) ? destMax: srcMax);
+        intervalsTracker[dest] = std::make_tuple(resultMin, resultMax);
+    }
+
+    // Returns reference to recently modified entry
+    return getPtrFromVariableName(dest);
 }
 
 void* IntervalTracker::loadVariableIntoRegister(LoadInst* i) {
@@ -196,8 +225,17 @@ IntervalTracker::interval_t IntervalTracker::addCallback(interval_t accumulator,
     double max = std::get<1>(accumulator);
     double currentMin = std::get<0>(current);
     double currentMax = std::get<1>(current);
-    double resultMin = (std::isnan(currentMin) || std::isnan(min)) ? std::nan("-infinity") : (min + currentMin);
-    double resultMax = (std::isnan(currentMax) || std::isnan(max)) ? std::nan("+infinity") : (max + currentMax);
+    double resultMin = 0.0;
+    double resultMax = 0.0;
+    if (!isInLoop()) {
+        resultMin = (std::isnan(currentMin) || std::isnan(min)) ? std::nan("-infinity") : (min + currentMin);
+        resultMax = (std::isnan(currentMax) || std::isnan(max)) ? std::nan("+infinity") : (max + currentMax);
+    }
+    else {
+        resultMin = (std::isnan(max)) ? min : max;
+        resultMin = (std::isnan(resultMin)) ? std::nan("-infinity") : resultMin;
+        resultMax = std::nan("+infinity");
+    }
     return std::make_tuple(resultMin, resultMax);
 }
 
@@ -206,8 +244,17 @@ IntervalTracker::interval_t IntervalTracker::subCallback(interval_t accumulator,
     double max = std::get<1>(accumulator);
     double currentMin = std::get<0>(current);
     double currentMax = std::get<1>(current);
-    double resultMin = (std::isnan(currentMin) || std::isnan(min)) ? std::nan("-infinity") : (min - currentMin);
-    double resultMax = (std::isnan(currentMax) || std::isnan(max)) ? std::nan("+infinity") : (max - currentMax);
+    double resultMin = 0.0;
+    double resultMax = 0.0;
+    if (!isInLoop()) {
+        resultMin = (std::isnan(currentMin) || std::isnan(min)) ? std::nan("-infinity") : (min - currentMin);
+        resultMax = (std::isnan(currentMax) || std::isnan(max)) ? std::nan("+infinity") : (max - currentMax);
+    }
+    else {
+        resultMin = std::nan("-infinity");
+        resultMax = (std::isnan(min)) ? max : min;
+        resultMax = (std::isnan(resultMax)) ? std::nan("+infinity") : resultMax;
+    }
     return std::make_tuple(resultMin, resultMax);
 }
 
@@ -216,8 +263,42 @@ IntervalTracker::interval_t IntervalTracker::mulCallback(interval_t accumulator,
     double max = std::get<1>(accumulator);
     double currentMin = std::get<0>(current);
     double currentMax = std::get<1>(current);
-    double resultMin = (std::isnan(currentMin) || std::isnan(min)) ? std::nan("-infinity") : (min * currentMin);
-    double resultMax = (std::isnan(currentMax) || std::isnan(max)) ? std::nan("+infinity") : (max * currentMax);
+    double resultMin = 0.0;
+    double resultMax = 0.0;
+    if (!isInLoop()) {
+        resultMin = (std::isnan(currentMin) || std::isnan(min)) ? std::nan("-infinity") : (min * currentMin);
+        resultMax = (std::isnan(currentMax) || std::isnan(max)) ? std::nan("+infinity") : (max * currentMax);
+    }
+    else {
+        if (((min < 1) && (min > 0)) ||
+            ((max < 1) && (max > 0)) ||
+            ((currentMin < 1) && (currentMin > 0)) ||
+            ((currentMax < 1) && (currentMax > 0))) {
+            resultMin = 0;
+            resultMax = max;
+        }
+        else if (((min > -1) && (min < 0)) ||
+                ((max > -1) && (max < 0)) ||
+                ((currentMin > -1) && (currentMin < 0)) ||
+                ((currentMax > -1) && (currentMax < 0))) {
+            resultMin = min;
+            resultMax = 0;
+        }
+        else if (((min >= 1) && (max >= 1) && (currentMin >= 1) && (currentMax >= 1)) ||
+                 ((min <= -1) && (max <= -1) && (currentMin <= -1) && (currentMax <= -1))) {
+            resultMin = min;
+            resultMax = std::nan("+infinity");
+        }
+        else if (((min >= 1) && (max >= 1) && (currentMin <= 1) && (currentMax <= 1)) ||
+                 ((min <= -1) && (max <= -1) && (currentMin >= -1) && (currentMax >= -1))) {
+            resultMin = std::nan("-infinity");
+            resultMax = max;
+        }
+        else {
+            resultMin = min;
+            resultMax = max;
+        }
+    }
     return std::make_tuple(resultMin, resultMax);
 }
 

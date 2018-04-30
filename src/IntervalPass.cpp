@@ -81,8 +81,6 @@ int main (int argc, char **argv) {
             IntervalTracker::var_map_t variableIntervalEndpoints = std::get<0>(analysisPackage);
             IntervalTracker::var_map_t variableIntervalLeafNodes = getLeafNodes(variableIntervalEndpoints);
             printf("\nVar: %s Interval Report\n", argv[2]);
-            printIntervalReport(variableIntervalEndpoints);
-            printf("\n");
             printf("\n");
             printIntervalReport(variableIntervalLeafNodes);
         }
@@ -104,19 +102,22 @@ analysis_package_t generateCFG (BasicBlock* BB,
   // Create local copies of parameters that can be updated
   AnalyzeLoopBackedgeSwtch newBackedgeSwitch = backedgeSwitch;
   std::stack<BasicBlock*> newLoopCallStack = !loopCallStack.empty() ? std::stack<BasicBlock*>(loopCallStack) : std::stack<BasicBlock*>();
+  IntervalAnalyzer* tempIntervalAnalyzer = new IntervalAnalyzer(*intervalAnalyzer);
 
   // Track loop layer by pushing them into the stack
   if (isBeginLoop(blockName)) {
       newLoopCallStack.push(BB);
+      tempIntervalAnalyzer->IntervalTracker::switchLoopState(true);
   }
   // Untrack the loop when a loop ends
   if (isEndLoop(blockName)) {
       newLoopCallStack.pop();
       // Turn back on to prepare for any outer loops
       newBackedgeSwitch = ON;
+      tempIntervalAnalyzer->IntervalTracker::switchLoopState(false);
   }
 
-  IntervalAnalyzer* newIntervalAnalyzer = analyzeInterval(BB, intervalAnalyzer);
+  IntervalAnalyzer* newIntervalAnalyzer = analyzeInterval(BB, tempIntervalAnalyzer);
   IntervalTracker::interval_t interval = newIntervalAnalyzer->getUpdatedInterval();
   IntervalTracker::var_map_t intervalEndpointTracker({{contextName, interval}});
 
@@ -209,7 +210,9 @@ void printIntervalReport(IntervalTracker::var_map_t intervals) {
         std::string contextName = it.first;
         double min = std::get<0>(it.second);
         double max = std::get<1>(it.second);
-        printf("Context: %s - [ %lf , %lf ]\n", contextName.c_str(), min, max);
+        std::string minString = (std::isnan(min)) ? "-infinity" : std::to_string(min);
+        std::string maxString = (std::isnan(max)) ? "+infinity" : std::to_string(max);
+        printf("Context: %s - [ %s , %s ]\n", contextName.c_str(), minString.c_str(), maxString.c_str());
     }
     printf("\n");
 }

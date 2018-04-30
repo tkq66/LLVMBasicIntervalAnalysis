@@ -18,6 +18,7 @@ IntervalAnalyzer::IntervalAnalyzer(std::string varName) {
 IntervalAnalyzer::IntervalAnalyzer(const IntervalAnalyzer& intervalAnalyzer) {
     variableName = intervalAnalyzer.getVariableName();
     interval = IntervalTracker::interval_t(intervalAnalyzer.getInterval());
+    IntervalTracker::switchLoopState(intervalAnalyzer.IntervalTracker::isInLoop());
     ValueTracker::var_map_t vTracker = intervalAnalyzer.IntervalTracker::getValueTracker();
     IntervalTracker::var_map_t iTracker = intervalAnalyzer.IntervalTracker::getIntervalsTracker();
     IntervalTracker::setTracker(iTracker, vTracker);

@@ -31,6 +31,8 @@ class IntervalTracker : public Tracker {
         void setTracker(ValueTracker::var_map_t tracker);
         void setTracker(IntervalTracker::var_map_t tracker);
         void setTracker(IntervalTracker::var_map_t iTracker, ValueTracker::var_map_t vTracker);
+        void switchLoopState(bool state);
+        bool isInLoop() const;
 
         // Tracker methods
         void printTracker() override;
@@ -45,6 +47,7 @@ class IntervalTracker : public Tracker {
         // Core tracker state
         ValueTracker valueTracker;
         var_map_t intervalsTracker;
+        bool loopState;
 
         // Caclulation helpers
         var_t calculateArithmetic(Instruction* i, arithmetic_function_t callback);
